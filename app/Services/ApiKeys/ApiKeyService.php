@@ -3,11 +3,28 @@
 namespace App\Services\ApiKeys;
 
 use App\Models\ApiKey;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class ApiKeyService
 {
-    private const TYPES = ['client', 'website', 'integration'];
+    public const TYPES = ['client', 'website', 'integration'];
+
+    public const SCOPES = [
+        'ingest:write',
+        'players:read',
+        'stats:read',
+        'events:read',
+        'sessions:read',
+        'leaderboards:read',
+        'presence:read',
+        'admin:keys',
+        'admin:players',
+        'admin:servers',
+        'admin:seasons',
+        'admin:users',
+        'admin:audit',
+    ];
 
     public function create(array $attributes): array
     {
@@ -19,19 +36,45 @@ class ApiKeyService
             throw new \InvalidArgumentException('Unsupported API key type.');
         }
 
+        $scopes = array_values(array_unique($attributes['scopes'] ?? []));
+
+        foreach ($scopes as $scope) {
+            if (!in_array($scope, self::SCOPES, true)) {
+                throw new \InvalidArgumentException("Unsupported scope: {$scope}");
+            }
+        }
+
+        if ($type === 'client' && !in_array('ingest:write', $scopes, true)) {
+            throw new \InvalidArgumentException('Client keys require the ingest:write scope.');
+        }
+
         $token = "mst_{$type}_{$id}_{$secret}";
 
-        $key = ApiKey::query()->create([
-            'id' => $id,
-            'workspace_id' => $attributes['workspace_id'],
-            'name' => $attributes['name'],
-            'prefix' => "mst_{$type}_".Str::substr($id, 0, 8),
-            'hash' => $this->hashSecret($secret),
-            'description' => $attributes['description'] ?? null,
-            'enabled' => true,
-            'expires_at' => $attributes['expires_at'] ?? null,
-            'created_by' => $attributes['created_by'] ?? null,
-        ]);
+        $key = DB::transaction(function () use ($attributes, $id, $secret, $type, $scopes): ApiKey {
+            $key = ApiKey::query()->create([
+                'id' => $id,
+                'workspace_id' => $attributes['workspace_id'],
+                'name' => $attributes['name'],
+                'type' => $type,
+                'prefix' => "mst_{$type}_".Str::substr($id, 0, 8),
+                'hash' => $this->hashSecret($secret),
+                'description' => $attributes['description'] ?? null,
+                'enabled' => true,
+                'expires_at' => $attributes['expires_at'] ?? null,
+                'created_by' => $attributes['created_by'] ?? null,
+            ]);
+
+            if ($scopes !== []) {
+                DB::table('api_key_scopes')->insert(
+                    array_map(fn (string $scope) => [
+                        'api_key_id' => $key->id,
+                        'scope' => $scope,
+                    ], $scopes),
+                );
+            }
+
+            return $key;
+        });
 
         return [$key, $token];
     }
@@ -52,7 +95,7 @@ class ApiKeyService
 
         $key = ApiKey::query()->find($id);
 
-        if (!$key || !hash_equals($key->hash, $this->hashSecret($secret))) {
+        if (!$key || $key->type !== $type || !hash_equals($key->hash, $this->hashSecret($secret))) {
             return null;
         }
 
