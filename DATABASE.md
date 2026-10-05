@@ -195,13 +195,15 @@ The full secret is never persisted.
 PK:
 `(api_key_id, scope)`
 
-## api_key_player_restrictions
+## api_key_uuid_restrictions
 
 - api_key_id FK
-- player_id FK
+- minecraft_uuid UUID
 
 PK:
-`(api_key_id, player_id)`
+`(api_key_id, minecraft_uuid)`
+
+UUID restrictions are independent of player registration. A client UUID can therefore be authorized before the player has ever sent data.
 
 ## api_key_server_restrictions
 
