@@ -18,12 +18,6 @@ class ApiKeyService
         'sessions:read',
         'leaderboards:read',
         'presence:read',
-        'admin:keys',
-        'admin:players',
-        'admin:servers',
-        'admin:seasons',
-        'admin:users',
-        'admin:audit',
     ];
 
     public function create(array $attributes): array
