@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Services\ApiKeys\ApiKeyAccessService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class PresenceController
 {
+    public function __construct(private readonly ApiKeyAccessService $access) {}
+
     public function index(Request $request): JsonResponse
     {
         $key = $request->attributes->get('api_key');
@@ -25,12 +28,12 @@ class PresenceController
                 'game_sessions.last_seen_at',
             ]);
 
-        $restrictions = \DB::table('api_key_player_restrictions')
+        $restrictions = \DB::table('api_key_uuid_restrictions')
             ->where('api_key_id', $key->id)
-            ->pluck('player_id');
+            ->pluck('minecraft_uuid');
 
         if ($restrictions->isNotEmpty()) {
-            $query->whereIn('players.id', $restrictions);
+            $query->whereIn('players.minecraft_uuid', $restrictions);
         }
 
         return response()->json([
