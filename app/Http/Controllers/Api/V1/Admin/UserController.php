@@ -35,6 +35,36 @@ class UserController
             'role' => ['required', 'in:owner,admin,analyst,readonly'],
         ]);
 
+        $currentUser = $request->user('web');
+        $currentRole = DB::table('workspace_memberships')
+            ->where('workspace_id', $workspaceId)
+            ->where('user_id', $currentUser->id)
+            ->value('role');
+
+        if ($data['role'] === 'owner' && $currentRole !== 'owner') {
+            abort(403, 'Only the current owner may promote another user to owner.');
+        }
+
+        $targetRole = DB::table('workspace_memberships')
+            ->where('workspace_id', $workspaceId)
+            ->where('user_id', $user)
+            ->value('role');
+
+        if ($targetRole === 'owner' && $data['role'] !== 'owner') {
+            $ownerCount = DB::table('workspace_memberships')
+                ->where('workspace_id', $workspaceId)
+                ->where('role', 'owner')
+                ->count();
+
+            if ($ownerCount <= 1) {
+                abort(422, 'The workspace must keep at least one owner.');
+            }
+
+            if ($user === $currentUser->id && $currentRole === 'owner') {
+                abort(422, 'The last owner cannot demote themselves.');
+            }
+        }
+
         $updated = DB::table('workspace_memberships')
             ->where('workspace_id', $workspaceId)
             ->where('user_id', $user)
