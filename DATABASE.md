@@ -139,7 +139,7 @@ Append-only observations for graphing/auditing.
 Index:
 `(season_id, player_id, stat_definition_id, observed_at)`
 
-## sessions
+## game_sessions
 
 - id UUID PK
 - season_id FK
