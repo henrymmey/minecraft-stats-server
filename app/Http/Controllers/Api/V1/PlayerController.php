@@ -14,6 +14,7 @@ class PlayerController
 
         $query = Player::query()
             ->where('workspace_id', $key->workspace_id)
+            ->where('public', true)
             ->orderBy('current_username');
 
         $restrictions = \DB::table('api_key_player_restrictions')
@@ -47,7 +48,7 @@ class PlayerController
     {
         $key = $request->attributes->get('api_key');
 
-        abort_unless($player->workspace_id === $key->workspace_id, 404);
+        abort_unless($player->workspace_id === $key->workspace_id && $player->public, 404);
 
         $restricted = \DB::table('api_key_player_restrictions')
             ->where('api_key_id', $key->id)
