@@ -1,45 +1,61 @@
 # Minecraft Stats Server
 
-Self-hostable REST API and backend for Minecraft client statistics.
+Self-hostable REST API and backend for the Minecraft Stats Platform.
 
 ## Stack
 
-- PHP 8.5
+- PHP 8.3+
 - Laravel 13
 - PostgreSQL 18
-- Docker
-- OpenID Connect for administrative authentication
-- OpenAPI for the public API contract
+- Docker / Docker Compose
 
-Laravel 13 requires PHP 8.3+ and currently receives security fixes through March 17, 2028.
+## Local development
 
-## Responsibilities
+Run the documented local PostgreSQL stack:
 
-- Multi-workspace data isolation
-- Minecraft client ingestion
-- API key management
-- Scopes and resource restrictions
-- Players, seasons and servers
-- Statistics and history
-- Sessions and presence
-- Events
-- Website/read API
-- OIDC authentication
-- Admin authorization
-- Audit log
-- Rate limiting
-- Health/readiness checks
-- Database migrations
+```bash
+docker compose -f docker/compose.dev.yml up --build
+```
 
-## Related repositories
+The application listens on `http://localhost:8000`.
+
+For a local non-container setup:
+
+```bash
+composer install
+cp .env.example .env
+php artisan key:generate
+php artisan migrate
+php artisan serve
+```
+
+## API
+
+The first client endpoint is:
+
+```
+POST /api/v1/ingest/batch
+Authorization: Bearer mst_client_<uuid>_<secret>
+```
+
+The HTTP contract is maintained in:
+
+https://github.com/henrymmey/minecraft-stats-docs/tree/main/openapi
+
+## Security
+
+API keys are scoped credentials. Raw secrets are never persisted and are shown only once when created.
+
+Client keys should be restricted to the smallest possible set of players, servers and seasons.
+
+See [SECURITY.md](SECURITY.md).
+
+## Project repositories
 
 - Client: https://github.com/henrymmey/minecraft-stats-client
+- Server: https://github.com/henrymmey/minecraft-stats-server
 - Dashboard: https://github.com/henrymmey/minecraft-stats-dashboard
-- Docs/API contract: https://github.com/henrymmey/minecraft-stats-docs
-
-## Development
-
-The first implementation target is a modular Laravel monolith. Do not split the application into microservices unless a concrete scaling requirement justifies it.
+- Documentation: https://github.com/henrymmey/minecraft-stats-docs
 
 ## License
 
