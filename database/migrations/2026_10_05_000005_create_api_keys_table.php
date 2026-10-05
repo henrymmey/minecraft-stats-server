@@ -11,6 +11,7 @@ return new class extends Migration {
             $table->uuid('id')->primary();
             $table->foreignUuid('workspace_id')->constrained()->cascadeOnDelete();
             $table->string('name', 100);
+            $table->string('type', 32);
             $table->string('prefix', 80);
             $table->char('hash', 64)->unique();
             $table->string('description', 500)->nullable();
@@ -20,7 +21,7 @@ return new class extends Migration {
             $table->timestampTz('last_used_at')->nullable();
             $table->timestampsTz();
             $table->timestampTz('revoked_at')->nullable();
-            $table->index(['workspace_id', 'enabled']);
+            $table->index(['workspace_id', 'type', 'enabled']);
         });
 
         Schema::create('api_key_scopes', function (Blueprint $table) {
