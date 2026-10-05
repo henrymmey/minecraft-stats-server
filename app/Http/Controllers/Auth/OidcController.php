@@ -45,7 +45,7 @@ class OidcController
                 ],
             );
 
-            Auth::login($user, true);
+            Auth::login($user, false);
             request()->session()->regenerate();
 
             return redirect()->intended('/');
