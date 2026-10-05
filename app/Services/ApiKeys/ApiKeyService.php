@@ -42,6 +42,10 @@ class ApiKeyService
             throw new \InvalidArgumentException('Client keys require the ingest:write scope.');
         }
 
+        if ($type === 'website' && in_array('ingest:write', $scopes, true)) {
+            throw new \InvalidArgumentException('Website keys cannot have ingest:write.');
+        }
+
         $token = "mst_{$type}_{$id}_{$secret}";
 
         $key = DB::transaction(function () use ($attributes, $id, $secret, $type, $scopes): ApiKey {
