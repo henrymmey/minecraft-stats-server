@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\V1\BootstrapController;
 use App\Http\Controllers\Api\V1\IngestController;
 use App\Http\Controllers\Api\V1\Admin\ApiKeyController;
 use App\Http\Middleware\AuthenticateApiKey;
+use App\Http\Middleware\RequireApiScope;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
@@ -48,6 +49,21 @@ Route::prefix('v1')->group(function () {
         });
     });
 
-    Route::middleware(AuthenticateApiKey::class)
-        ->post('ingest/batch', [IngestController::class, 'store']);
+    Route::middleware(AuthenticateApiKey::class)->group(function () {
+        Route::post('ingest/batch', [IngestController::class, 'store'])
+            ->middleware('api.scope:ingest:write');
+
+        Route::get('players', [\App\Http\Controllers\Api\V1\PlayerController::class, 'index'])
+            ->middleware('api.scope:players:read');
+        Route::get('players/{player}', [\App\Http\Controllers\Api\V1\PlayerController::class, 'show'])
+            ->middleware('api.scope:players:read');
+        Route::get('players/{player}/stats', [\App\Http\Controllers\Api\V1\StatisticsController::class, 'player'])
+            ->middleware('api.scope:stats:read');
+        Route::get('leaderboards', [\App\Http\Controllers\Api\V1\LeaderboardController::class, 'index'])
+            ->middleware('api.scope:leaderboards:read');
+        Route::get('online', [\App\Http\Controllers\Api\V1\PresenceController::class, 'index'])
+            ->middleware('api.scope:presence:read');
+        Route::get('seasons', [\App\Http\Controllers\Api\V1\SeasonController::class, 'index'])
+            ->middleware('api.scope:stats:read');
+    });
 });
