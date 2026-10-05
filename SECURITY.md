@@ -58,7 +58,7 @@ Do not place admin access tokens in localStorage.
 4. Verify required scope.
 5. Resolve workspace from the key.
 6. Resolve player by Minecraft UUID in that workspace.
-7. Enforce player restriction.
+7. Enforce UUID restriction.
 8. Resolve registered server.
 9. Enforce server restriction.
 10. Resolve season.
