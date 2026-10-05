@@ -147,6 +147,10 @@ class OidcService
             throw new RuntimeException('OIDC issuer is not configured correctly.');
         }
 
+        if (config('services.oidc.require_https', true) && !str_starts_with($issuer, 'https://')) {
+            throw new RuntimeException('OIDC issuer must use HTTPS in production.');
+        }
+
         return Cache::remember(
             'oidc.metadata.'.hash('sha256', $issuer),
             now()->addHour(),
