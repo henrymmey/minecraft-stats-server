@@ -28,36 +28,7 @@ class ApiKeyController
             ->orderByDesc('created_at')
             ->get();
 
-        $keys->each(function (ApiKey $key): void {
-            $key->setAttribute(
-                'scopes',
-                DB::table('api_key_scopes')
-                    ->where('api_key_id', $key->id)
-                    ->pluck('scope')
-                    ->values(),
-            );
-            $key->setAttribute(
-                'player_restrictions',
-                DB::table('api_key_player_restrictions')
-                    ->where('api_key_id', $key->id)
-                    ->pluck('player_id')
-                    ->values(),
-            );
-            $key->setAttribute(
-                'server_restrictions',
-                DB::table('api_key_server_restrictions')
-                    ->where('api_key_id', $key->id)
-                    ->pluck('server_id')
-                    ->values(),
-            );
-            $key->setAttribute(
-                'season_restrictions',
-                DB::table('api_key_season_restrictions')
-                    ->where('api_key_id', $key->id)
-                    ->pluck('season_id')
-                    ->values(),
-            );
-        });
+        $keys->each(fn (ApiKey $key) => $this->attachRestrictions($key));
 
         return response()->json(['data' => $keys]);
     }
@@ -67,7 +38,6 @@ class ApiKeyController
         $workspaceId = $request->attributes->get('workspace_id');
         $data = $request->validated();
 
-        $this->assertWorkspaceResources($workspaceId, $data['player_restrictions'] ?? [], 'players');
         $this->assertWorkspaceResources($workspaceId, $data['server_restrictions'] ?? [], 'servers');
         $this->assertWorkspaceResources($workspaceId, $data['season_restrictions'] ?? [], 'seasons');
 
@@ -93,24 +63,27 @@ class ApiKeyController
         });
 
         return response()->json([
-            'data' => $key,
+            'data' => $this->attachRestrictions($key),
             'secret' => $secret,
         ], 201);
     }
 
     public function update(UpdateApiKeyRequest $request, ApiKey $key): JsonResponse
     {
-        abort_unless($key->workspace_id === $request->attributes->get('workspace_id'), 404);
+        $workspaceId = $request->attributes->get('workspace_id');
+        abort_unless($key->workspace_id === $workspaceId, 404);
 
         $data = $request->validated();
-        $workspaceId = $request->attributes->get('workspace_id');
 
-        $this->assertWorkspaceResources($workspaceId, $data['player_restrictions'] ?? [], 'players');
         $this->assertWorkspaceResources($workspaceId, $data['server_restrictions'] ?? [], 'servers');
         $this->assertWorkspaceResources($workspaceId, $data['season_restrictions'] ?? [], 'seasons');
 
         if ($key->type === 'client' && !in_array('ingest:write', $data['scopes'], true)) {
             abort(422, 'Client keys require the ingest:write scope.');
+        }
+
+        if ($key->type === 'website' && in_array('ingest:write', $data['scopes'], true)) {
+            abort(422, 'Website keys cannot have ingest:write.');
         }
 
         DB::transaction(function () use ($key, $data): void {
@@ -121,16 +94,12 @@ class ApiKeyController
             ]);
 
             DB::table('api_key_scopes')->where('api_key_id', $key->id)->delete();
-            DB::table('api_key_scopes')->insert(
-                array_map(fn (string $scope) => [
-                    'api_key_id' => $key->id,
-                    'scope' => $scope,
-                ], $data['scopes']),
-            );
+            DB::table('api_key_scopes')->insert(array_map(
+                fn (string $scope) => ['api_key_id' => $key->id, 'scope' => $scope],
+                $data['scopes'],
+            ));
 
-            $this->replaceRestrictionTable('api_key_player_restrictions', 'player_id', $key->id, $data['player_restrictions'] ?? []);
-            $this->replaceRestrictionTable('api_key_server_restrictions', 'server_id', $key->id, $data['server_restrictions'] ?? []);
-            $this->replaceRestrictionTable('api_key_season_restrictions', 'season_id', $key->id, $data['season_restrictions'] ?? []);
+            $this->replaceRestrictions($key, $data);
         });
 
         $this->audit->record(
@@ -142,16 +111,17 @@ class ApiKeyController
             ['scopes' => $data['scopes']],
         );
 
-        return response()->json(['data' => $this->serializedKey($key->fresh())]);
+        return response()->json(['data' => $this->attachRestrictions($key->fresh())]);
     }
 
     public function rotate(Request $request, ApiKey $key): JsonResponse
     {
-        abort_unless($key->workspace_id === $request->attributes->get('workspace_id'), 404);
+        $workspaceId = $request->attributes->get('workspace_id');
+        abort_unless($key->workspace_id === $workspaceId, 404);
 
         $result = DB::transaction(function () use ($request, $key): array {
             $scopes = DB::table('api_key_scopes')->where('api_key_id', $key->id)->pluck('scope')->all();
-            $players = DB::table('api_key_player_restrictions')->where('api_key_id', $key->id)->pluck('player_id')->all();
+            $uuids = DB::table('api_key_uuid_restrictions')->where('api_key_id', $key->id)->pluck('minecraft_uuid')->all();
             $servers = DB::table('api_key_server_restrictions')->where('api_key_id', $key->id)->pluck('server_id')->all();
             $seasons = DB::table('api_key_season_restrictions')->where('api_key_id', $key->id)->pluck('season_id')->all();
 
@@ -170,15 +140,15 @@ class ApiKeyController
                 'expires_at' => $key->expires_at,
             ]);
 
-            $this->replaceRestrictionTable('api_key_player_restrictions', 'player_id', $newKey->id, $players);
-            $this->replaceRestrictionTable('api_key_server_restrictions', 'server_id', $newKey->id, $servers);
-            $this->replaceRestrictionTable('api_key_season_restrictions', 'season_id', $newKey->id, $seasons);
+            $this->insertUuidRestrictions($newKey->id, $uuids);
+            $this->insertResourceRestrictions('api_key_server_restrictions', 'server_id', $newKey->id, $servers);
+            $this->insertResourceRestrictions('api_key_season_restrictions', 'season_id', $newKey->id, $seasons);
 
             return [$newKey, $secret];
         });
 
         $this->audit->record(
-            $key->workspace_id,
+            $workspaceId,
             $request->user('web')->id,
             'API_KEY_ROTATED',
             'api_key',
@@ -187,14 +157,15 @@ class ApiKeyController
         );
 
         return response()->json([
-            'data' => $this->serializedKey($result[0]),
+            'data' => $this->attachRestrictions($result[0]),
             'secret' => $result[1],
         ]);
     }
 
     public function revoke(Request $request, ApiKey $key): JsonResponse
     {
-        abort_unless($key->workspace_id === $request->attributes->get('workspace_id'), 404);
+        $workspaceId = $request->attributes->get('workspace_id');
+        abort_unless($key->workspace_id === $workspaceId, 404);
 
         $key->update([
             'enabled' => false,
@@ -202,7 +173,7 @@ class ApiKeyController
         ]);
 
         $this->audit->record(
-            $key->workspace_id,
+            $workspaceId,
             $request->user('web')->id,
             'API_KEY_REVOKED',
             'api_key',
@@ -227,17 +198,38 @@ class ApiKeyController
 
     private function replaceRestrictions(ApiKey $key, array $data): void
     {
-        DB::transaction(function () use ($key, $data): void {
-            $this->replaceRestrictionTable('api_key_player_restrictions', 'player_id', $key->id, $data['player_restrictions'] ?? []);
-            $this->replaceRestrictionTable('api_key_server_restrictions', 'server_id', $key->id, $data['server_restrictions'] ?? []);
-            $this->replaceRestrictionTable('api_key_season_restrictions', 'season_id', $key->id, $data['season_restrictions'] ?? []);
-        });
+        $this->replaceUuidRestrictions($key->id, $data['uuid_restrictions'] ?? []);
+        $this->replaceRestrictionTable('api_key_server_restrictions', 'server_id', $key->id, $data['server_restrictions'] ?? []);
+        $this->replaceRestrictionTable('api_key_season_restrictions', 'season_id', $key->id, $data['season_restrictions'] ?? []);
+    }
+
+    private function replaceUuidRestrictions(string $keyId, array $uuids): void
+    {
+        DB::table('api_key_uuid_restrictions')->where('api_key_id', $keyId)->delete();
+        $this->insertUuidRestrictions($keyId, $uuids);
+    }
+
+    private function insertUuidRestrictions(string $keyId, array $uuids): void
+    {
+        if ($uuids === []) return;
+
+        DB::table('api_key_uuid_restrictions')->insert(array_map(
+            fn (string $uuid) => [
+                'api_key_id' => $keyId,
+                'minecraft_uuid' => strtolower($uuid),
+            ],
+            array_values(array_unique($uuids)),
+        ));
     }
 
     private function replaceRestrictionTable(string $table, string $column, string $keyId, array $ids): void
     {
         DB::table($table)->where('api_key_id', $keyId)->delete();
+        $this->insertResourceRestrictions($table, $column, $keyId, $ids);
+    }
 
+    private function insertResourceRestrictions(string $table, string $column, string $keyId, array $ids): void
+    {
         if ($ids === []) return;
 
         DB::table($table)->insert(array_map(
@@ -246,12 +238,36 @@ class ApiKeyController
         ));
     }
 
-    private function serializedKey(ApiKey $key): ApiKey
+    private function attachRestrictions(ApiKey $key): ApiKey
     {
-        $key->setAttribute('scopes', DB::table('api_key_scopes')->where('api_key_id', $key->id)->pluck('scope')->values());
-        $key->setAttribute('player_restrictions', DB::table('api_key_player_restrictions')->where('api_key_id', $key->id)->pluck('player_id')->values());
-        $key->setAttribute('server_restrictions', DB::table('api_key_server_restrictions')->where('api_key_id', $key->id)->pluck('server_id')->values());
-        $key->setAttribute('season_restrictions', DB::table('api_key_season_restrictions')->where('api_key_id', $key->id)->pluck('season_id')->values());
+        $key->setAttribute(
+            'uuid_restrictions',
+            DB::table('api_key_uuid_restrictions')
+                ->where('api_key_id', $key->id)
+                ->pluck('minecraft_uuid')
+                ->values(),
+        );
+        $key->setAttribute(
+            'server_restrictions',
+            DB::table('api_key_server_restrictions')
+                ->where('api_key_id', $key->id)
+                ->pluck('server_id')
+                ->values(),
+        );
+        $key->setAttribute(
+            'season_restrictions',
+            DB::table('api_key_season_restrictions')
+                ->where('api_key_id', $key->id)
+                ->pluck('season_id')
+                ->values(),
+        );
+        $key->setAttribute(
+            'scopes',
+            DB::table('api_key_scopes')
+                ->where('api_key_id', $key->id)
+                ->pluck('scope')
+                ->values(),
+        );
 
         return $key;
     }
