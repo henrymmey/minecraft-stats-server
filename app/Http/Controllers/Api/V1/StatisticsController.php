@@ -11,7 +11,7 @@ class StatisticsController
     public function player(Request $request, Player $player): JsonResponse
     {
         $key = $request->attributes->get('api_key');
-        abort_unless($player->workspace_id === $key->workspace_id, 404);
+        abort_unless($player->workspace_id === $key->workspace_id && $player->public, 404);
 
         $playerRestricted = \DB::table('api_key_player_restrictions')
             ->where('api_key_id', $key->id)
