@@ -24,10 +24,12 @@ class BootstrapController
                 $request->user('web'),
             );
         } catch (\Throwable $e) {
+            report($e);
+
             return response()->json([
                 'error' => [
                     'code' => 'INVALID_BOOTSTRAP_TOKEN',
-                    'message' => $e->getMessage(),
+                    'message' => 'The bootstrap token is invalid, expired or cannot be used.',
                     'request_id' => $request->attributes->get('request_id'),
                 ],
             ], 422);
