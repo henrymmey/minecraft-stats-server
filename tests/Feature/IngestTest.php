@@ -12,9 +12,9 @@ class IngestTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_allowed_client_key_can_ingest_for_an_allowed_player(): void
+    public function test_allowed_client_key_can_ingest_for_an_allowed_uuid(): void
     {
-        [$workspaceId, $serverId, $seasonId, $playerId] = $this->seedWorkspace();
+        [$workspaceId, , $seasonId, $playerId] = $this->seedWorkspace();
 
         [, $token] = app(ApiKeyService::class)->create([
             'workspace_id' => $workspaceId,
@@ -23,16 +23,15 @@ class IngestTest extends TestCase
             'scopes' => ['ingest:write'],
         ]);
 
-        DB::table('api_key_player_restrictions')->insert([
+        $playerUuid = DB::table('players')->where('id', $playerId)->value('minecraft_uuid');
+
+        DB::table('api_key_uuid_restrictions')->insert([
             'api_key_id' => DB::table('api_keys')->where('workspace_id', $workspaceId)->value('id'),
-            'player_id' => $playerId,
+            'minecraft_uuid' => $playerUuid,
         ]);
 
-        $playerUuid = DB::table('players')->where('id', $playerId)->value('minecraft_uuid');
-        $payload = $this->payload($playerUuid);
-
         $this->withHeader('Authorization', 'Bearer '.$token)
-            ->postJson('/api/v1/ingest/batch', $payload)
+            ->postJson('/api/v1/ingest/batch', $this->payload($playerUuid))
             ->assertOk()
             ->assertJsonPath('accepted', true);
 
@@ -43,9 +42,10 @@ class IngestTest extends TestCase
         ]);
     }
 
-    public function test_restricted_client_key_cannot_create_or_ingest_for_another_player(): void
+    public function test_uuid_restricted_client_key_rejects_another_uuid(): void
     {
         [$workspaceId, , , $allowedPlayerId] = $this->seedWorkspace();
+        $allowedUuid = DB::table('players')->where('id', $allowedPlayerId)->value('minecraft_uuid');
         $otherUuid = (string) Str::uuid();
 
         [, $token] = app(ApiKeyService::class)->create([
@@ -57,19 +57,47 @@ class IngestTest extends TestCase
 
         $keyId = DB::table('api_keys')->where('workspace_id', $workspaceId)->value('id');
 
-        DB::table('api_key_player_restrictions')->insert([
+        DB::table('api_key_uuid_restrictions')->insert([
             'api_key_id' => $keyId,
-            'player_id' => $allowedPlayerId,
+            'minecraft_uuid' => $allowedUuid,
         ]);
 
-        $response = $this->withHeader('Authorization', 'Bearer '.$token)
-            ->postJson('/api/v1/ingest/batch', $this->payload($otherUuid));
-
-        $response->assertStatus(403);
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson('/api/v1/ingest/batch', $this->payload($otherUuid))
+            ->assertForbidden();
 
         $this->assertDatabaseMissing('players', [
             'workspace_id' => $workspaceId,
             'minecraft_uuid' => $otherUuid,
+        ]);
+    }
+
+    public function test_uuid_restriction_can_be_provisioned_before_player_exists(): void
+    {
+        [$workspaceId] = $this->seedWorkspace();
+        $newUuid = (string) Str::uuid();
+
+        [, $token] = app(ApiKeyService::class)->create([
+            'workspace_id' => $workspaceId,
+            'name' => 'Preprovisioned',
+            'type' => 'client',
+            'scopes' => ['ingest:write'],
+        ]);
+
+        $keyId = DB::table('api_keys')->where('workspace_id', $workspaceId)->value('id');
+
+        DB::table('api_key_uuid_restrictions')->insert([
+            'api_key_id' => $keyId,
+            'minecraft_uuid' => $newUuid,
+        ]);
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson('/api/v1/ingest/batch', $this->payload($newUuid))
+            ->assertOk();
+
+        $this->assertDatabaseHas('players', [
+            'workspace_id' => $workspaceId,
+            'minecraft_uuid' => $newUuid,
         ]);
     }
 
