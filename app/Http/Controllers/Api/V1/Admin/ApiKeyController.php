@@ -71,22 +71,26 @@ class ApiKeyController
         $this->assertWorkspaceResources($workspaceId, $data['server_restrictions'] ?? [], 'servers');
         $this->assertWorkspaceResources($workspaceId, $data['season_restrictions'] ?? [], 'seasons');
 
-        [$key, $secret] = $this->keys->create([
-            ...$data,
-            'workspace_id' => $workspaceId,
-            'created_by' => $request->user('web')->id,
-        ]);
+        [$key, $secret] = DB::transaction(function () use ($data, $workspaceId, $request): array {
+            [$key, $secret] = $this->keys->create([
+                ...$data,
+                'workspace_id' => $workspaceId,
+                'created_by' => $request->user('web')->id,
+            ]);
 
-        $this->replaceRestrictions($key, $data);
+            $this->replaceRestrictions($key, $data);
 
-        $this->audit->record(
-            $workspaceId,
-            $request->user('web')->id,
-            'API_KEY_CREATED',
-            'api_key',
-            $key->id,
-            ['type' => $key->type, 'scopes' => $data['scopes']],
-        );
+            $this->audit->record(
+                $workspaceId,
+                $request->user('web')->id,
+                'API_KEY_CREATED',
+                'api_key',
+                $key->id,
+                ['type' => $key->type, 'scopes' => $data['scopes']],
+            );
+
+            return [$key, $secret];
+        });
 
         return response()->json([
             'data' => $key,
