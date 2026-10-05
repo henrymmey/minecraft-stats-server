@@ -3,15 +3,22 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Models\Player;
+use App\Services\ApiKeys\ApiKeyAccessService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class StatisticsController
 {
+    public function __construct(private readonly ApiKeyAccessService $access) {}
+
     public function player(Request $request, Player $player): JsonResponse
     {
         $key = $request->attributes->get('api_key');
         abort_unless($player->workspace_id === $key->workspace_id && $player->public, 404);
+
+        if (!$this->access->allowsPlayerUuid($key, $player->minecraft_uuid)) {
+            abort(403);
+        }
 
         $playerRestricted = \DB::table('api_key_player_restrictions')
             ->where('api_key_id', $key->id)
