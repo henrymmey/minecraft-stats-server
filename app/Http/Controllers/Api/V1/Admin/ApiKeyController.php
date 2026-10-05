@@ -6,14 +6,17 @@ use App\Http\Requests\CreateApiKeyRequest;
 use App\Http\Requests\UpdateApiKeyRequest;
 use App\Models\ApiKey;
 use App\Services\ApiKeys\ApiKeyService;
+use App\Services\Audit\AuditService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class ApiKeyController
 {
-    public function __construct(private readonly ApiKeyService $keys)
-    {
+    public function __construct(
+        private readonly ApiKeyService $keys,
+        private readonly AuditService $audit,
+    ) {
     }
 
     public function index(Request $request): JsonResponse
@@ -76,6 +79,15 @@ class ApiKeyController
 
         $this->replaceRestrictions($key, $data);
 
+        $this->audit->record(
+            $workspaceId,
+            $request->user('web')->id,
+            'API_KEY_CREATED',
+            'api_key',
+            $key->id,
+            ['type' => $key->type, 'scopes' => $data['scopes']],
+        );
+
         return response()->json([
             'data' => $key,
             'secret' => $secret,
@@ -117,6 +129,15 @@ class ApiKeyController
             $this->replaceRestrictionTable('api_key_season_restrictions', 'season_id', $key->id, $data['season_restrictions'] ?? []);
         });
 
+        $this->audit->record(
+            $workspaceId,
+            $request->user('web')->id,
+            'API_KEY_UPDATED',
+            'api_key',
+            $key->id,
+            ['scopes' => $data['scopes']],
+        );
+
         return response()->json(['data' => $this->serializedKey($key->fresh())]);
     }
 
@@ -152,6 +173,15 @@ class ApiKeyController
             return [$newKey, $secret];
         });
 
+        $this->audit->record(
+            $key->workspace_id,
+            $request->user('web')->id,
+            'API_KEY_ROTATED',
+            'api_key',
+            $key->id,
+            ['replacement_key_id' => $result[0]->id],
+        );
+
         return response()->json([
             'data' => $this->serializedKey($result[0]),
             'secret' => $result[1],
@@ -166,6 +196,14 @@ class ApiKeyController
             'enabled' => false,
             'revoked_at' => now(),
         ]);
+
+        $this->audit->record(
+            $key->workspace_id,
+            $request->user('web')->id,
+            'API_KEY_REVOKED',
+            'api_key',
+            $key->id,
+        );
 
         return response()->json(null, 204);
     }
