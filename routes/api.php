@@ -2,11 +2,19 @@
 
 use App\Http\Controllers\Api\V1\IngestController;
 use App\Http\Middleware\AuthenticateApiKey;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
     Route::get('health/live', fn () => response()->json(['status' => 'ok']));
-    Route::get('health/ready', fn () => response()->json(['status' => 'ok']));
+    Route::get('health/ready', function () {
+        try {
+            DB::select('select 1');
+            return response()->json(['status' => 'ok']);
+        } catch (\Throwable) {
+            return response()->json(['status' => 'unavailable'], 503);
+        }
+    });
 
     Route::middleware(['web', 'auth:web'])->post('setup/bootstrap', [\App\Http\Controllers\Api\V1\BootstrapController::class, 'store']);
 
