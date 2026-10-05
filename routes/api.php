@@ -8,12 +8,12 @@ Route::prefix('v1')->group(function () {
     Route::get('health/live', fn () => response()->json(['status' => 'ok']));
     Route::get('health/ready', fn () => response()->json(['status' => 'ok']));
 
-    Route::middleware('auth:web')->post('setup/bootstrap', [\App\Http\Controllers\Api\V1\BootstrapController::class, 'store']);
+    Route::middleware(['web', 'auth:web'])->post('setup/bootstrap', [\App\Http\Controllers\Api\V1\BootstrapController::class, 'store']);
 
     Route::middleware(AuthenticateApiKey::class)
         ->post('ingest/batch', [IngestController::class, 'store']);
 
-    Route::middleware(['auth:web', 'workspace.admin'])->prefix('admin')->group(function () {
+    Route::middleware(['web', 'auth:web', 'workspace.admin'])->prefix('admin')->group(function () {
         Route::get('me', fn (\Illuminate\Http\Request $request) => response()->json([
             'id' => $request->user('web')->id,
             'display_name' => $request->user('web')->display_name,
