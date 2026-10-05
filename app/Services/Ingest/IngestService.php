@@ -7,6 +7,7 @@ use App\Models\GameSession;
 use App\Models\MinecraftServer;
 use App\Models\Player;
 use App\Models\Season;
+use App\Services\ApiKeys\ApiKeyAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -15,6 +16,8 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class IngestService
 {
+    public function __construct(private readonly ApiKeyAccessService $access) {}
+
     public function handle(array $payload, ApiKey $key, Request $request): array
     {
         $this->assertScope($key, 'ingest:write');
@@ -26,6 +29,10 @@ class IngestService
             $restrictedPlayerIds = DB::table('api_key_player_restrictions')
                 ->where('api_key_id', $key->id)
                 ->pluck('player_id');
+
+            if (!$this->access->allowsPlayerUuid($key, $minecraftUuid)) {
+                throw new AccessDeniedHttpException('The API key is not authorized for this player UUID.');
+            }
 
             $playerQuery = Player::query()
                 ->where('workspace_id', $workspaceId)
