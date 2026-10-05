@@ -23,6 +23,10 @@ class OidcController
     public function callback(): RedirectResponse
     {
         try {
+            if (!request()->filled('state') || !request()->filled('code')) {
+                throw new \RuntimeException('Missing OIDC callback parameters.');
+            }
+
             $result = $this->oidc->authenticate(
                 (string) request('state'),
                 (string) request('code'),
