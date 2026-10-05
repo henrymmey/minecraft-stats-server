@@ -3,11 +3,14 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Models\Player;
+use App\Services\ApiKeys\ApiKeyAccessService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class PlayerController
 {
+    public function __construct(private readonly ApiKeyAccessService $access) {}
+
     public function index(Request $request): JsonResponse
     {
         $key = $request->attributes->get('api_key');
@@ -17,12 +20,12 @@ class PlayerController
             ->where('public', true)
             ->orderBy('current_username');
 
-        $restrictions = \DB::table('api_key_player_restrictions')
+        $restrictions = \DB::table('api_key_uuid_restrictions')
             ->where('api_key_id', $key->id)
-            ->pluck('player_id');
+            ->pluck('minecraft_uuid');
 
         if ($restrictions->isNotEmpty()) {
-            $query->whereIn('id', $restrictions);
+            $query->whereIn('minecraft_uuid', $restrictions);
         }
 
         if ($request->filled('search')) {
@@ -50,14 +53,7 @@ class PlayerController
 
         abort_unless($player->workspace_id === $key->workspace_id && $player->public, 404);
 
-        $restricted = \DB::table('api_key_player_restrictions')
-            ->where('api_key_id', $key->id)
-            ->exists();
-
-        if ($restricted && !\DB::table('api_key_player_restrictions')
-            ->where('api_key_id', $key->id)
-            ->where('player_id', $player->id)
-            ->exists()) {
+        if (!$this->access->allowsPlayerUuid($key, $player->minecraft_uuid)) {
             abort(403);
         }
 
