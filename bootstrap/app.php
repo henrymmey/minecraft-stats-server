@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\RequestId;
+use App\Http\Middleware\RequireApiScope;
 use App\Http\Middleware\WorkspaceAdmin;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
@@ -22,6 +23,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->append(RequestId::class);
         $middleware->alias([
             'workspace.admin' => WorkspaceAdmin::class,
+            'api.scope' => RequireApiScope::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
