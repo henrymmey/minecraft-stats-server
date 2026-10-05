@@ -4,7 +4,6 @@ use App\Http\Controllers\Api\V1\BootstrapController;
 use App\Http\Controllers\Api\V1\IngestController;
 use App\Http\Controllers\Api\V1\Admin\ApiKeyController;
 use App\Http\Middleware\AuthenticateApiKey;
-use App\Http\Middleware\RequireApiScope;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
@@ -57,10 +56,6 @@ Route::prefix('v1')->group(function () {
             Route::get('users', [\App\Http\Controllers\Api\V1\Admin\UserController::class, 'index']);
             Route::put('users/{user}', [\App\Http\Controllers\Api\V1\Admin\UserController::class, 'update']);
             Route::get('audit-log', [\App\Http\Controllers\Api\V1\Admin\AuditLogController::class, 'index']);
-            Route::post('api-keys', [ApiKeyController::class, 'store']);
-            Route::put('api-keys/{key}', [ApiKeyController::class, 'update']);
-            Route::post('api-keys/{key}/rotate', [ApiKeyController::class, 'rotate']);
-            Route::post('api-keys/{key}/revoke', [ApiKeyController::class, 'revoke']);
         });
     });
 
