@@ -15,6 +15,7 @@ class ApiKey extends Model
         'id',
         'workspace_id',
         'name',
+        'type',
         'prefix',
         'hash',
         'description',
