@@ -46,6 +46,21 @@ Route::prefix('v1')->group(function () {
             Route::put('api-keys/{key}', [ApiKeyController::class, 'update']);
             Route::post('api-keys/{key}/rotate', [ApiKeyController::class, 'rotate']);
             Route::post('api-keys/{key}/revoke', [ApiKeyController::class, 'revoke']);
+
+            Route::get('players', [\App\Http\Controllers\Api\V1\Admin\PlayerController::class, 'index']);
+            Route::get('servers', [\App\Http\Controllers\Api\V1\Admin\ServerController::class, 'index']);
+            Route::post('servers', [\App\Http\Controllers\Api\V1\Admin\ServerController::class, 'store']);
+            Route::put('servers/{server}', [\App\Http\Controllers\Api\V1\Admin\ServerController::class, 'update']);
+            Route::get('seasons', [\App\Http\Controllers\Api\V1\Admin\SeasonController::class, 'index']);
+            Route::post('seasons', [\App\Http\Controllers\Api\V1\Admin\SeasonController::class, 'store']);
+            Route::post('seasons/{season}/activate', [\App\Http\Controllers\Api\V1\Admin\SeasonController::class, 'activate']);
+            Route::get('users', [\App\Http\Controllers\Api\V1\Admin\UserController::class, 'index']);
+            Route::put('users/{user}', [\App\Http\Controllers\Api\V1\Admin\UserController::class, 'update']);
+            Route::get('audit-log', [\App\Http\Controllers\Api\V1\Admin\AuditLogController::class, 'index']);
+            Route::post('api-keys', [ApiKeyController::class, 'store']);
+            Route::put('api-keys/{key}', [ApiKeyController::class, 'update']);
+            Route::post('api-keys/{key}/rotate', [ApiKeyController::class, 'rotate']);
+            Route::post('api-keys/{key}/revoke', [ApiKeyController::class, 'revoke']);
         });
     });
 
