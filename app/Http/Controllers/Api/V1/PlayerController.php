@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Models\Player;
-use App\Models\Season;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -12,6 +11,7 @@ class PlayerController
     public function index(Request $request): JsonResponse
     {
         $key = $request->attributes->get('api_key');
+
         $query = Player::query()
             ->where('workspace_id', $key->workspace_id)
             ->orderBy('current_username');
@@ -25,11 +25,21 @@ class PlayerController
         }
 
         if ($request->filled('search')) {
-            $query->where('current_username', 'ilike', '%'.str_replace('%', '\\%', $request->string('search')).'%');
+            $term = str_replace(['%', '_'], ['\\%', '\\_'], $request->string('search')->toString());
+            $query->where('current_username', 'ilike', '%'.$term.'%');
         }
 
+        $paginator = $query->paginate(
+            min(max((int) $request->integer('per_page', 50), 1), 100),
+        );
+
         return response()->json([
-            'data' => $query->paginate(min((int) $request->integer('per_page', 50), 100)),
+            'data' => $paginator->items(),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
         ]);
     }
 
