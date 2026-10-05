@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
     public function up(): void
     {
-        Schema::create('sessions', function (Blueprint $table) {
+        Schema::create('game_sessions', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->foreignUuid('season_id')->constrained()->cascadeOnDelete();
             $table->foreignUuid('player_id')->constrained()->cascadeOnDelete();
@@ -27,7 +27,7 @@ return new class extends Migration {
             $table->uuid('id')->primary();
             $table->foreignUuid('season_id')->constrained()->cascadeOnDelete();
             $table->foreignUuid('player_id')->constrained()->cascadeOnDelete();
-            $table->foreignUuid('session_id')->nullable()->constrained('sessions')->nullOnDelete();
+            $table->foreignUuid('session_id')->nullable()->constrained('game_sessions')->nullOnDelete();
             $table->uuid('client_event_id')->unique();
             $table->string('type', 64);
             $table->timestampTz('occurred_at');
@@ -39,6 +39,6 @@ return new class extends Migration {
     public function down(): void
     {
         Schema::dropIfExists('events');
-        Schema::dropIfExists('sessions');
+        Schema::dropIfExists('game_sessions');
     }
 };
