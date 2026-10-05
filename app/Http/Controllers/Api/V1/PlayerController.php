@@ -43,7 +43,10 @@ class PlayerController
             ->where('api_key_id', $key->id)
             ->exists();
 
-        if ($restricted && !$key->restrictedPlayers()->whereKey($player->id)->exists()) {
+        if ($restricted && !\DB::table('api_key_player_restrictions')
+            ->where('api_key_id', $key->id)
+            ->where('player_id', $player->id)
+            ->exists()) {
             abort(403);
         }
 
