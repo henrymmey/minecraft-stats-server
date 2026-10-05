@@ -33,4 +33,9 @@ class Player extends Model
     {
         return $this->belongsToMany(ApiKey::class, 'api_key_player_restrictions');
     }
+
+    public function resolveRouteBindingQuery($query, $value, $field = null)
+    {
+        return $query->where($field ?? 'minecraft_uuid', strtolower((string) $value));
+    }
 }
