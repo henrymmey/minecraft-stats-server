@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Services\ApiKeys\ApiKeyAccessService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class LeaderboardController
 {
+    public function __construct(private readonly ApiKeyAccessService $access) {}
+
     public function index(Request $request): JsonResponse
     {
         $key = $request->attributes->get('api_key');
@@ -42,12 +45,12 @@ class LeaderboardController
             ->where('player_stats.stat_definition_id', $definition->id)
             ->where('players.public', true);
 
-        $playerRestrictions = \DB::table('api_key_player_restrictions')
+        $playerRestrictions = \DB::table('api_key_uuid_restrictions')
             ->where('api_key_id', $key->id)
-            ->pluck('player_id');
+            ->pluck('minecraft_uuid');
 
         if ($playerRestrictions->isNotEmpty()) {
-            $query->whereIn('players.id', $playerRestrictions);
+            $query->whereIn('players.minecraft_uuid', $playerRestrictions);
         }
 
         $limit = min(max((int) $request->integer('limit', 10), 1), 100);
