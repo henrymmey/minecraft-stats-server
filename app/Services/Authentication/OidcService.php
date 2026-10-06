@@ -92,6 +92,10 @@ class OidcService
                         ...$tokenRequest,
                         'client_secret' => (string) config('services.oidc.client_secret'),
                     ]);
+            } elseif ($authMethod === 'none') {
+                $response = $http
+                    ->asForm()
+                    ->post($metadata['token_endpoint'], $tokenRequest);
             } else {
                 throw new RuntimeException(
                     sprintf('Unsupported OIDC token endpoint authentication method: %s.', $authMethod),
@@ -154,7 +158,7 @@ class OidcService
 
         $methods = array_values(array_intersect(
             $advertised,
-            ['client_secret_post', 'client_secret_basic'],
+            ['client_secret_post', 'client_secret_basic', 'none'],
         ));
 
         if ($methods === []) {
