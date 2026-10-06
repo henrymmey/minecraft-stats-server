@@ -1,6 +1,6 @@
-# Minecraft Stats Server
+# HM Stats Server
 
-Self-hostable REST API and backend for the Minecraft Stats Platform.
+Self-hostable REST API and backend for the HM Stats.
 
 ## Stack
 
