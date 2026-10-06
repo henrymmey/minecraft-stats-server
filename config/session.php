@@ -12,7 +12,7 @@ return [
     'table' => env('SESSION_TABLE', 'sessions'),
     'store' => env('SESSION_STORE'),
     'lottery' => [2, 100],
-    'cookie' => env('SESSION_COOKIE', Str::slug((string) env('APP_NAME', 'minecraft-stats')).'-session'),
+    'cookie' => env('SESSION_COOKIE', Str::slug((string) env('APP_NAME', 'hm-stats')).'-session'),
     'path' => env('SESSION_PATH', '/'),
     'domain' => env('SESSION_DOMAIN'),
     'secure' => env('SESSION_SECURE_COOKIE'),
