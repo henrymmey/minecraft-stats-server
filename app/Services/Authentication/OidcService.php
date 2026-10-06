@@ -70,22 +70,59 @@ class OidcService
             'code_verifier' => $verifier,
         ];
 
-        $authMethods = $metadata['token_endpoint_auth_methods_supported'] ?? ['client_secret_basic'];
+        $authMethods = $this->tokenEndpointAuthMethods($metadata);
+        $response = null;
+        $attemptedMethods = [];
 
-        if (in_array('client_secret_basic', $authMethods, true)) {
-            $response = $http
-                ->withBasicAuth(
-                    (string) config('services.oidc.client_id'),
-                    (string) config('services.oidc.client_secret'),
-                )
-                ->asForm()
-                ->post($metadata['token_endpoint'], $tokenRequest);
-        } else {
-            $tokenRequest['client_secret'] = config('services.oidc.client_secret');
-            $response = $http->asForm()->post($metadata['token_endpoint'], $tokenRequest);
+        foreach ($authMethods as $authMethod) {
+            $attemptedMethods[] = $authMethod;
+
+            if ($authMethod === 'client_secret_basic') {
+                $response = $http
+                    ->withBasicAuth(
+                        (string) config('services.oidc.client_id'),
+                        (string) config('services.oidc.client_secret'),
+                    )
+                    ->asForm()
+                    ->post($metadata['token_endpoint'], $tokenRequest);
+            } elseif ($authMethod === 'client_secret_post') {
+                $response = $http
+                    ->asForm()
+                    ->post($metadata['token_endpoint'], [
+                        ...$tokenRequest,
+                        'client_secret' => (string) config('services.oidc.client_secret'),
+                    ]);
+            } else {
+                throw new RuntimeException(
+                    sprintf('Unsupported OIDC token endpoint authentication method: %s.', $authMethod),
+                );
+            }
+
+            if ($response->successful()) {
+                break;
+            }
+
+            if ($response->json('error') !== 'invalid_client') {
+                break;
+            }
         }
 
-        $response->throw();
+        if ($response === null) {
+            throw new RuntimeException('OIDC token endpoint authentication could not be attempted.');
+        }
+
+        if (!$response->successful()) {
+            if ($response->json('error') === 'invalid_client') {
+                throw new RuntimeException(
+                    'OIDC token endpoint rejected client authentication after trying: '.
+                    implode(', ', $attemptedMethods).
+                    '. Check OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, and OIDC_TOKEN_ENDPOINT_AUTH_METHOD.',
+                );
+            }
+
+            $response->throw();
+        }
+
         $tokens = $response->json();
 
         if (!is_array($tokens) || empty($tokens['id_token'])) {
@@ -99,6 +136,32 @@ class OidcService
             'claims' => $claims,
             'metadata' => $metadata,
         ];
+    }
+
+    private function tokenEndpointAuthMethods(array $metadata): array
+    {
+        $configured = trim((string) config('services.oidc.token_endpoint_auth_method', 'auto'));
+
+        if ($configured !== '' && $configured !== 'auto') {
+            return [$configured];
+        }
+
+        $advertised = $metadata['token_endpoint_auth_methods_supported'] ?? [];
+
+        if (!is_array($advertised)) {
+            $advertised = [];
+        }
+
+        $methods = array_values(array_intersect(
+            $advertised,
+            ['client_secret_post', 'client_secret_basic'],
+        ));
+
+        if ($methods === []) {
+            return ['client_secret_basic'];
+        }
+
+        return $methods;
     }
 
     private function transactionCacheKey(string $state): string
