@@ -32,11 +32,11 @@ PostgreSQL data lives in a named persistent volume.
 
 The image registry target is GitHub Container Registry:
 
-`ghcr.io/henrymmey/minecraft-stats-server`
+`ghcr.io/henrymmey/hm-stats-server`
 
 and:
 
-`ghcr.io/henrymmey/minecraft-stats-dashboard`
+`ghcr.io/henrymmey/hm-stats-dashboard`
 
 Secrets must be supplied through environment variables initially, with Docker Secrets support planned for hardened deployments.
 
