@@ -19,5 +19,5 @@ return [
             'serialize' => false,
         ],
     ],
-    'prefix' => env('CACHE_PREFIX', 'minecraft_stats'),
+    'prefix' => env('CACHE_PREFIX', 'hm_stats'),
 ];
