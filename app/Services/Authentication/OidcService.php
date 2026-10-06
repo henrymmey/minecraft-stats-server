@@ -116,12 +116,21 @@ class OidcService
         }
 
         if (!$response->successful()) {
-            if ($response->json('error') === 'invalid_client') {
-                throw new RuntimeException(
-                    'OIDC token endpoint rejected client authentication after trying: '.
+            $providerError = (string) $response->json('error', 'unknown_error');
+            $providerDescription = trim((string) $response->json('error_description', ''));
+
+            if ($providerError === 'invalid_client') {
+                $message = 'OIDC token endpoint rejected client authentication after trying: '.
                     implode(', ', $attemptedMethods).
-                    '. Check OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, and OIDC_TOKEN_ENDPOINT_AUTH_METHOD.',
-                );
+                    '.';
+
+                if ($providerDescription !== '') {
+                    $message .= ' Provider: '.$providerDescription;
+                }
+
+                $message .= ' Check OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, OIDC_TOKEN_ENDPOINT_AUTH_METHOD, and the authentik client configuration.';
+
+                throw new RuntimeException($message);
             }
 
             $response->throw();
