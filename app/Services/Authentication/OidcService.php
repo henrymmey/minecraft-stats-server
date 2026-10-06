@@ -98,7 +98,7 @@ class OidcService
         ];
     }
 
-    private function verifyIdToken(string $idToken, string $jwksUri, string $expectedNonce): array
+    private function transactionCacheKey(string $state): string\n    {\n        return 'oidc.transaction.'.hash('sha256', $state);\n    }\n\n    private function verifyIdToken(string $idToken, string $jwksUri, string $expectedNonce): array
     {
         $jwks = Cache::remember(
             'oidc.jwks.'.hash('sha256', $jwksUri),
