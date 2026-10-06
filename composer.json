@@ -1,8 +1,8 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "henrymmey/minecraft-stats-server",
+    "name": "henrymmey/hm-stats-server",
     "type": "project",
-    "description": "Self-hostable REST API and backend for the Minecraft Stats Platform.",
+    "description": "Self-hostable REST API and backend for the HM Stats.",
     "license": "MIT",
     "require": {
         "php": "^8.3",
