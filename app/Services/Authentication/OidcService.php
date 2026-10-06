@@ -23,11 +23,14 @@ class OidcService
             '-_',
         ), '=');
 
-        session([
-            'oidc.state' => $state,
-            'oidc.nonce' => $nonce,
-            'oidc.verifier' => $verifier,
-        ]);
+        Cache::put(
+            $this->transactionCacheKey($state),
+            [
+                'nonce' => $nonce,
+                'verifier' => $verifier,
+            ],
+            now()->addMinutes(10),
+        );
 
         return $metadata['authorization_endpoint'].'?'.http_build_query([
             'response_type' => 'code',
@@ -43,14 +46,14 @@ class OidcService
 
     public function authenticate(string $state, string $code): array
     {
-        if (!hash_equals((string) session('oidc.state', ''), $state)) {
+        $transaction = Cache::pull($this->transactionCacheKey($state));
+
+        if (!is_array($transaction)) {
             throw new RuntimeException('OIDC state validation failed.');
         }
 
-        $verifier = (string) session('oidc.verifier', '');
-        $nonce = (string) session('oidc.nonce', '');
-
-        session()->forget(['oidc.state', 'oidc.nonce', 'oidc.verifier']);
+        $verifier = (string) ($transaction['verifier'] ?? '');
+        $nonce = (string) ($transaction['nonce'] ?? '');
 
         if ($verifier === '' || $nonce === '') {
             throw new RuntimeException('OIDC transaction is missing or expired.');
@@ -98,7 +101,12 @@ class OidcService
         ];
     }
 
-    private function transactionCacheKey(string $state): string\n    {\n        return 'oidc.transaction.'.hash('sha256', $state);\n    }\n\n    private function verifyIdToken(string $idToken, string $jwksUri, string $expectedNonce): array
+    private function transactionCacheKey(string $state): string
+    {
+        return 'oidc.transaction.'.hash('sha256', $state);
+    }
+
+    private function verifyIdToken(string $idToken, string $jwksUri, string $expectedNonce): array
     {
         $jwks = Cache::remember(
             'oidc.jwks.'.hash('sha256', $jwksUri),
